@@ -17,7 +17,7 @@ install.packages("fdrtool")
 
 # Example
 
-Explore network hubs and clusters from penalized precision matrix estimate:
+Explore network clusters from penalized precision matrix estimates:
 
 ```r
 library(huge)

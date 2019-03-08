@@ -13,6 +13,7 @@ install.packages("BDgraph")<br/>
 install.packages("GGMridge")<br/>
 install.packages("rags2ridges")<br/>
 install.packages("FastGGM")
+install.packages("fdrtool")
 
 # Example
 

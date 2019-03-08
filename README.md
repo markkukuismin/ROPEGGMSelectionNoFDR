@@ -22,6 +22,7 @@ Explore network hubs and clusters from penalized precision matrix estimate:
 library(huge)
 library(igraph)
 library(rags2ridges)
+library(fdrtool)
 
 source("ROPE.txt")
 source("crossvalidationROPE.txt")
@@ -41,13 +42,10 @@ n = 100
 nmb = p*(p-1)/2
 
 I = diag(1,p)
-```
-Simulate data:
 
-```r
-v = 0.8
-u = 0.1
-L = huge.generator(n=n,d=p,g=4,graph="hub",v=v,u=u)  # Generate data with hub structures
+#Simulate data:
+set.seed(242377)
+L = huge.generator(n=n,d=p,g=4,graph="cluster")  # Generate data with hub structures
 
 Sigma = L$sigma
 Theta = L$theta
@@ -86,28 +84,113 @@ OPT = optPenalty.LOOCV(Yvalid, lambdaMin = .5, lambdaMax = 30, step = 40,verbose
 
 ThetaRagsRidge = ridgeP(cov(Y),lambda=OPT$optLambda,target=I)
 
-ThetaRagsRidge = sparsify(ThetaRagsRidge, threshold = "localFDR",verbose = F)
+SparseThetaRagsRidge = sparsify(ThetaRagsRidge, threshold = "localFDR",verbose = F)
 
-ARagsRidge = ifelse(ThetaRagsRidge$sparsePrecision != 0, 1, 0); diag(ARagsRidge) = 0
+ARagsRidge = ifelse(SparseThetaRagsRidge$sparsePrecision != 0, 1, 0); diag(ARagsRidge) = 0
 
 ###################################################
 
 PoissonG = graph.adjacency(AROPEPoisson,mode="undirected",diag=F)
-KernelG = graph.adjacency(AROPEKernel,mode="undirected",diag=F)
-RagsRidgeG = graph.adjacency(ARagsRidge,mode="undirected",diag=F)
-```
-Plot graphs:
+ClustersPoisson = walktrap.community(PoissonG)
 
-```r
+KernelG = graph.adjacency(AROPEKernel,mode="undirected",diag=F)
+ClustersKernel = walktrap.community(KernelG)
+
+RagsRidgeG = graph.adjacency(ARagsRidge,mode="undirected",diag=F)
+ClustersRagsRidge = walktrap.community(RagsRidgeG)
+
+#Plot graphs and clusters:
+  
 par(mfrow=c(2,2))
 
-plot(TrueG, vertex.label=NA, vertex.size=5,main="Ground truth graph")
-plot(PoissonG, vertex.label=NA, vertex.size=5,main="ROPE (Poisson)")
-plot(KernelG, vertex.label=NA, vertex.size=5,main="ROPE (Kernel)")
-plot(RagsRidgeG, vertex.label=NA, vertex.size=5,main="Rags2Ridges")
+plot(ClustersTrue, TrueG, vertex.label=NA, vertex.size=5,main="Ground truth graph")
+plot(ClustersPoisson, PoissonG, vertex.label=NA, vertex.size=5,main="ROPE (Poisson)")
+plot(ClustersKernel, KernelG, vertex.label=NA, vertex.size=5,main="ROPE (Kernel)")
+plot(ClustersRagsRidge, RagsRidgeG, vertex.label=NA, vertex.size=5,main="Rags2Ridges")
 ```
-![graphfigures](https://user-images.githubusercontent.com/40263834/51476596-a5754b80-1d8e-11e9-9fe7-7f6e9571608f.png)
 
-Change n = 200 (400 samples) and five (5) hubs:
+![graph1](https://user-images.githubusercontent.com/40263834/54021553-12a33b80-4199-11e9-98a5-1b0685fa46fa.png)
 
-![graphfigures2](https://user-images.githubusercontent.com/40263834/51476807-495ef700-1d8f-11e9-9842-b7f8e2ed9c10.png)
+
+```r
+# Larger sample size:
+
+n = 200
+
+X = mvrnorm(2*n,rep(0,p),Sigma)
+X = huge.npn(X)
+
+Yvalid = X[1:n,]
+Y = X[(n+1):(2*n),]
+
+lambdaROPE = ROPEPoissonEED(Yvalid,lambda=lambda,alpha=alpha,target=I)$lambda
+
+ROPEPoisson = ROPEPoissonEED(Y,lambda=lambdaROPE,alpha=alpha,target=I,cv=F)
+ROPEKer = ROPEKernelEED(Y,lambda=lambdaROPE,alpha=alpha,target=I,cv=F)
+
+AROPEPoisson = ROPEPoisson$IndROPEPoisson
+AROPEKernel = ROPEKer$IndROPEKernel
+
+#####################################################################################
+
+OPT = optPenalty.LOOCV(Yvalid, lambdaMin = .5, lambdaMax = 30, step = 40,verbose = F,graph=F,target = I)
+
+ThetaRagsRidge = ridgeP(cov(Y),lambda=OPT$optLambda,target=I)
+
+SparseThetaRagsRidge = sparsify(ThetaRagsRidge, threshold = "localFDR",verbose = F)
+
+ARagsRidge = ifelse(SparseThetaRagsRidge$sparsePrecision != 0, 1, 0); diag(ARagsRidge) = 0
+
+###################################################
+
+PoissonG = graph.adjacency(AROPEPoisson,mode="undirected",diag=F)
+ClustersPoisson = walktrap.community(PoissonG)
+
+KernelG = graph.adjacency(AROPEKernel,mode="undirected",diag=F)
+ClustersKernel = walktrap.community(KernelG)
+
+RagsRidgeG = graph.adjacency(ARagsRidge,mode="undirected",diag=F)
+ClustersRagsRidge = walktrap.community(RagsRidgeG)
+
+par(mfrow=c(2,2))
+
+plot(ClustersTrue, TrueG, vertex.label=NA, vertex.size=5,main="Ground truth graph")
+plot(ClustersPoisson, PoissonG, vertex.label=NA, vertex.size=5,main="ROPE (Poisson)")
+plot(ClustersKernel, KernelG, vertex.label=NA, vertex.size=5,main="ROPE (Kernel)")
+plot(ClustersRagsRidge, RagsRidgeG, vertex.label=NA, vertex.size=5,main="Rags2Ridges")
+```
+
+![graph2](https://user-images.githubusercontent.com/40263834/54021962-079cdb00-419a-11e9-9a40-1d248c3fd6d2.png)
+
+```r
+# RagsRidge without FDR control:
+
+# Calculate p-values from the RagsRdige Regularized partial correlations
+
+R = pcor(ThetaRagsRidge) # Compute the partial correlation matrix
+
+R = R[upper.tri(R)]
+
+EmpiricDistribution = fdrtool(R,statistic = "correlation",verbose = F,plot=F) 
+
+pvalues = EmpiricDistribution$pval # p-values determined from the partical correlation coefficients
+
+ARagsRidgeNoFDR = matrix(0,p,p)
+
+pvalues[pvalues > alpha] = 0 # Not significant p-values
+pvalues[pvalues != 0] = 1
+
+ARagsRidgeNoFDR[upper.tri(ARagsRidgeNoFDR)] = pvalues
+
+ARagsRidgeNoFDR = ARagsRidgeNoFDR + t(ARagsRidgeNoFDR)
+
+RagsRidgeGNoFDR = graph.adjacency(ARagsRidgeNoFDR,mode="undirected",diag=F)
+
+ClustersRagsRidgeNoFDR = walktrap.community(RagsRidgeGNoFDR)
+
+par(mfrow=c(1,2))
+
+plot(ClustersRagsRidge, RagsRidgeG, vertex.label=NA, vertex.size=5,main="Rags2Ridges")
+plot(ClustersRagsRidgeNoFDR, RagsRidgeGNoFDR, vertex.label=NA, vertex.size=5,main="Rags2Ridges (No FDR)")
+```
+![graph3](https://user-images.githubusercontent.com/40263834/54021977-12f00680-419a-11e9-8a77-ba24f88c3e6f.png)

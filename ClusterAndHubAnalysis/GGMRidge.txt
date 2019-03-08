@@ -1,0 +1,62 @@
+
+library(base)
+
+GGMRidge = function(Y,cv=NULL,FDRLevel=NULL,lambda=NULL){
+
+	if(is.null(cv)) cv = F
+	if(is.null(FDRLevel)) FDRLevel = 0.01
+	
+	p = ncol(Y)
+	n = nrow(Y)
+	
+	stddata <- scale(x = Y, center = TRUE, scale = TRUE)
+	
+	###############################
+    # estimate ridge parameter
+    ###############################
+	
+	if(cv==T){
+	
+		lambdaarray <- seq(from = 0.1, to = 20, by = 0.1) * (n-1.0)
+		fit <- lambda.cv(x = stddata, lambda = lambdaarray, fold = 10L)
+	
+		lambda <- fit$lambda[which.min(fit$spe)]/(n-1)
+	
+	}
+	
+	###############################
+	# calculate partial correlation
+	# using ridge inverse
+	###############################
+	
+	wupper <- which(upper.tri(diag(p)))
+	partial <- solve(lambda * diag(p) + cor(Y))
+	partial <- (-scaledMat(x = partial))[wupper]
+	
+	###############################
+	# get p-values from empirical
+	# null distribution
+	###############################
+	
+	efron.fit <- getEfronp(z = transFisher(x = partial), bins = 50L, maxQ = 13)
+	
+	###############################
+	# estimate the edge set of
+	# partial correlation graph with
+	# FDR control at level FDRLevel
+	###############################
+	
+	warray <- which(upper.tri(diag(p)),arr.ind=TRUE)
+	wsig <- which(p.adjust(efron.fit$correctp, method="BH") < FDRLevel )
+	E <- warray[wsig,]
+
+	###############################
+	# structured estimation
+	###############################
+	
+	fit <- structuredEstimate(x = stddata, E = E)
+	ThPartial <- fit$R
+
+	return(list("GGMRidgePartialCor" = ThPartial,"lambda"=lambda))
+
+}

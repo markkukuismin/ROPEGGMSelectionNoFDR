@@ -1,0 +1,30 @@
+ROPE = function(S,rho,target=NULL){
+
+  # S = p x p sample covariance matrix (zero centered data)
+  
+  # rho = The penalty parameter
+  
+  # target = A symmetric and positive definite matrix. The estimate approaches target matrix as the penalty parameter (rho) increases
+  
+  p = ncol(S)
+  
+  if(is.null(target)) target = matrix(0,p,p)
+  
+  S = S - 2*rho*target
+  
+  LM = eigen(S)
+  
+  L = LM$values
+
+  M = LM$vectors
+
+  Lambda = 2/(L + sqrt(L^2 + 8*rho))
+
+  Lambda = sort(Lambda,decreasing=T)
+
+  M2 = t(t(M[,p:1])*Lambda)
+  hatTheta = M2%*%t(M[,p:1])
+  
+  return(hatTheta)
+  
+}
